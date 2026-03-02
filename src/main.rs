@@ -2,6 +2,7 @@ mod application;
 mod domain;
 mod infrastructure;
 use crate::application::use_cases::fetch_hot_news::{FetchHotNewsService, FetchHotNewsUseCase};
+use crate::domain::{Domain, NewsClassificationService};
 use infrastructure::news_sources::HackerNewsSource;
 
 #[tokio::main]
@@ -11,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // ===== 方式 1：单源抓取（现在也包含去重和排序）=====
     let hn_fetcher = HackerNewsSource::new();
     let use_case = FetchHotNewsService::new(&hn_fetcher);
-    let news_items = use_case.execute(5).await?;
+    let news_items = use_case.execute(10).await?;
 
     // ===== 方式 2：多源聚合 =====
     // 🔑 包装成 Arc，因为 AggregateNewsService 需要 Arc<dyn NewsFetcher>
@@ -19,18 +20,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //     .add_fetcher(Arc::new(HackerNewsSource::new()));
     // let news_items = use_case.execute(5).await?;
 
-    // ===== 展示结果 =====
-    for (i, news) in news_items.iter().enumerate() {
-        println!("【{}】{}", i + 1, news.title);
-        println!("    来源: {}", news.source);
-        println!("    作者: {}", news.author);
-        println!("    链接: {}", news.url);
+    // ===== 使用全局分类器 =====
+    let classifier = NewsClassificationService::instance();
+
+    // 按领域分组
+    let grouped = classifier.group_by_domain(&news_items);
+
+    println!("═════════════════════════════════════════════\n");
+
+    // 展示 AI 领域新闻
+    let ai_news = grouped.get(&Domain::AI).unwrap();
+    if !ai_news.is_empty() {
+        println!("🤖 AI 领域 ({} 条)", ai_news.len());
+        println!("───────────────────────────────────────────");
+        for (i, news) in ai_news.iter().enumerate() {
+            print_news_item(i + 1, news);
+        }
         println!();
     }
 
-    println!("✅ 完成！");
+    // 展示 Block 领域新闻
+    let block_news = grouped.get(&Domain::Block).unwrap();
+    if !block_news.is_empty() {
+        println!("⛓️  Block 领域 ({} 条)", block_news.len());
+        println!("───────────────────────────────────────────");
+        for (i, news) in block_news.iter().enumerate() {
+            print_news_item(i + 1, news);
+        }
+        println!();
+    }
+
+    // 展示 Social 领域新闻
+    let social_news = grouped.get(&Domain::Social).unwrap();
+    if !social_news.is_empty() {
+        println!("📱 Social 领域 ({} 条)", social_news.len());
+        println!("───────────────────────────────────────────");
+        for (i, news) in social_news.iter().enumerate() {
+            print_news_item(i + 1, news);
+        }
+        println!();
+    }
+
+    // 展示未分类新闻
+    let uncategorized = grouped.get(&Domain::Uncategorized).unwrap();
+    if !uncategorized.is_empty() {
+        println!("📋 其他分类 ({} 条)", uncategorized.len());
+        println!("───────────────────────────────────────────");
+        for (i, news) in uncategorized.iter().enumerate() {
+            print_news_item(i + 1, news);
+        }
+        println!();
+    }
+
+    println!("═════════════════════════════════════════════");
+    println!("✅ 完成！共 {} 条新闻", news_items.len());
 
     Ok(())
+}
+
+fn print_news_item(index: usize, news: &domain::NewsItem) {
+    println!("  【{}】{}", index, news.title);
+    println!("      来源: {} | 作者: {}", news.source, news.author);
+    println!("      链接: {}", news.url);
 }
 
 // ========== 集成测试 ==========

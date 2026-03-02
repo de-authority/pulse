@@ -28,23 +28,31 @@
 - 第 3 步：NewsFetcher 接口移至 Domain 层
 - 第 4 步：引入 Application 层（UseCase 模式）
 - 第 5 步：多源聚合（AggregateNewsService）
+- 第 6 步：领域分类（NewsClassificationService）
 
 ### 目录结构
 src/
 ├── domain/
-│   ├── entities/news_item.rs          (新闻实体)
-│   ├── fetchers/news_fetcher.rs      (NewsFetcher 接口)
+│   ├── entities/
+│   │   ├── news_item.rs             (新闻实体)
+│   │   └── mod.rs                  (Domain 枚举定义)
+│   ├── fetchers/
+│   │   └── news_fetcher.rs         (NewsFetcher 接口)
+│   ├── services/
+│   │   ├── news_deduplication_service.rs
+│   │   ├── news_sorting_service.rs
+│   │   └── news_classification_service.rs  (分类服务)
 │   └── mod.rs
 ├── application/
 │   └── use_cases/
-│       ├── fetch_hot_news.rs         (单源抓取用例)
+│       ├── fetch_hot_news.rs         (单源抓取用例 + 集成分类)
 │       ├── aggregate_news.rs         (多源聚合用例)
 │       └── mod.rs
 ├── infrastructure/
 │   └── news_sources/
 │       ├── hacker_news_source.rs      (HackerNews 实现)
 │       └── mod.rs
-└── main.rs                            (启动入口)
+└── main.rs                            (启动入口 + 分类展示)
 
 ---
 
@@ -99,12 +107,56 @@ Infrastructure -> Domain （Infrastructure 实现业务接口）
 
 ---
 
-## 后续方向
-
 ### 第 6 步：领域分类
-- 为新闻添加领域属性（AI/Block/Social）
-- 实现分类规则（关键词匹配、来源判断等）
-- 支持按领域筛选
+学习目标：理解领域服务的设计和分类规则的实现
+
+要点：
+- 定义 Domain 枚举（AI、Block、Social、Uncategorized）
+- 创建 NewsClassificationService 作为 Domain Service
+- 支持多种分类策略：
+  - 关键词匹配（标题、URL）
+  - 来源映射（固定来源属于某个领域）
+  - 可扩展的自定义规则
+- 提供批量分类、按领域筛选、按领域分组等功能
+- 分类不修改 NewsItem 实体，保持纯粹性
+
+关键决策：
+1. **分类服务位置**：放在 Domain 层
+   - 理由：分类是核心业务规则，属于领域逻辑
+   - 符合 DDD 的 Domain Service 模式
+
+2. **不修改 NewsItem**：分类结果不存储在实体中
+   - 理由：分类是上下文相关的，同一新闻在不同场景可能属于不同领域
+   - 使用纯函数式分类，更容易测试和维护
+
+3. **可扩展性设计**：
+   - 支持动态添加关键词
+   - 支持来源映射
+   - 可以轻松扩展到基于机器学习的分类
+
+4. **全局单例模式**（优化）：
+   - 使用 `NewsClassificationService::instance()` 获取全局单例
+   - 避免在多个 UseCase 中创建重复实例
+   - 线程安全（基于 `OnceLock`）
+   - 懒初始化（首次使用时才创建）
+
+优化说明：
+- **问题**：之前 `FetchHotNewsService` 持有独立的 `NewsClassificationService` 实例
+- **解决**：改为使用全局单例，任何地方都可以通过 `NewsClassificationService::instance()` 访问
+- **好处**：
+  - 消除重复实例，节省内存
+  - 统一分类规则，保证一致性
+  - 调用方更灵活，无需通过 Service 访问分类器
+  - 符合 DRY 原则（Don't Repeat Yourself）
+
+测试覆盖：
+- 11 个单元测试覆盖所有分类功能
+- 集成测试验证完整的业务流程
+- 所有 40 个测试全部通过
+
+---
+
+## 后续方向
 
 ### 第 7 步：持久化层
 - 引入数据库（SQLite/PostgreSQL）
@@ -125,9 +177,9 @@ Infrastructure -> Domain （Infrastructure 实现业务接口）
 
 ## 当前位置
 
-[第 1-3 步] -> [第 4 步：Application 层] -> [第 5 步：多源聚合]
-                                                        ↓
-                                                  准备第 6 步
+[第 1-3 步] -> [第 4 步：Application 层] -> [第 5 步：多源聚合] -> [第 6 步：领域分类 ✓]
+                                                                                           ↓
+                                                                                     准备第 7 步
 
 ---
 
