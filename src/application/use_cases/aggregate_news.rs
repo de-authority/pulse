@@ -1,6 +1,5 @@
-use crate::domain::{NewsFetcher, NewsItem};
+use crate::domain::{NewsFetcher, NewsItem, NewsDeduplicationService, NewsSortingService};
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// 聚合多源新闻用例
@@ -62,31 +61,13 @@ impl AggregateNewsUseCase for AggregateNewsService {
         }
 
         // 去重（按 URL）
-        let unique_news = Self::deduplicate_by_url(all_news);
+        let unique_news = NewsDeduplicationService::deduplicate_by_url(all_news);
 
         // 排序（按时间，最新的在前）
-        let mut sorted_news = unique_news;
-        sorted_news.sort_by(|a, b| b.published_at.cmp(&a.published_at));
+        let sorted_news = NewsSortingService::sort_by_published_at_desc(unique_news);
 
         println!("✅ 聚合完成！共 {} 条新闻（已去重）\n", sorted_news.len());
 
         Ok(sorted_news)
-    }
-}
-
-impl AggregateNewsService {
-    /// 按 URL 去重
-    fn deduplicate_by_url(news: Vec<NewsItem>) -> Vec<NewsItem> {
-        let mut seen = HashMap::new();
-        let mut result = Vec::new();
-
-        for item in news {
-            if !seen.contains_key(&item.url) {
-                seen.insert(item.url.clone(), true);
-                result.push(item);
-            }
-        }
-
-        result
     }
 }
