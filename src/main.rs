@@ -1,27 +1,27 @@
+mod application;
 mod domain;
 mod infrastructure;
-mod application;
-
-use domain::NewsFetcher;
+use crate::application::use_cases::aggregate_news::AggregateNewsUseCase;
+use application::{AggregateNewsService};
 use infrastructure::news_sources::HackerNewsSource;
-use application::FetchHotNewsUseCase;
-use application::FetchHotNewsService;
+use std::sync::Arc; // 新增导入
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("🚀 TrendArc - 热点新闻聚合器\n");
-    
-    // ===== Presentation 层：组装依赖 =====
-    let hn_fetcher = HackerNewsSource::new();
-    let use_case = FetchHotNewsService::new(&hn_fetcher);
-    
-    // ===== Application 层：执行业务用例 =====
-    let limit = 5;
-    let news_items = use_case.execute(limit).await?;
-    
-    // ===== Presentation 层：展示结果 =====
-    println!("📡 抓取完成！获得 {} 条新闻\n", news_items.len());
-    
+
+    // ===== 方式 1：单源抓取 =====
+    // let hn_fetcher = HackerNewsSource::new();
+    // let use_case = FetchHotNewsService::new(&hn_fetcher);
+    // let news_items = use_case.execute(5).await?;
+
+    // ===== 方式 2：多源聚合 =====
+    // 🔑 包装成 Arc，因为 NewsAggregator 需要 Arc<dyn NewsFetcher>
+    let use_case = AggregateNewsService::new().add_fetcher(Arc::new(HackerNewsSource::new()));
+
+    let news_items = use_case.execute(5).await?;
+
+    // ===== 展示结果 =====
     for (i, news) in news_items.iter().enumerate() {
         println!("【{}】{}", i + 1, news.title);
         println!("    来源: {}", news.source);
@@ -29,8 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("    链接: {}", news.url);
         println!();
     }
-    
+
     println!("✅ 完成！");
-    
+
     Ok(())
 }

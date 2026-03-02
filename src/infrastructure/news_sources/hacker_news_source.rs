@@ -54,7 +54,7 @@ impl HackerNewsSource {
 
 #[async_trait]
 impl NewsFetcher for HackerNewsSource {
-    async fn fetch(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error>> {
+    async fn fetch(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error + Send + Sync>> {
         // Step 1: Get top story IDs
         let ids_url = format!("{}/topstories.json", self.api_base);
         let ids: Vec<u32> = self.client.get(&ids_url).send().await?.json().await?;

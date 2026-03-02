@@ -13,7 +13,7 @@ use async_trait::async_trait;
 /// - 不涉及核心业务规则（那是 Domain 层的事）
 #[async_trait]
 pub trait FetchHotNewsUseCase: Send + Sync {
-    async fn execute(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error>>;
+    async fn execute(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 /// 默认实现
@@ -29,7 +29,7 @@ impl<'a> FetchHotNewsService<'a> {
 
 #[async_trait]
 impl<'a> FetchHotNewsUseCase for FetchHotNewsService<'a> {
-    async fn execute(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error>> {
+    async fn execute(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn std::error::Error + Send + Sync>> {
         // 这里可以添加更多业务逻辑：去重、过滤、排序等
         // 目前只是简单调用 fetcher
         self.fetcher.fetch(limit).await

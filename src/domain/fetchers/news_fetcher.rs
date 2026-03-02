@@ -6,7 +6,7 @@ use std::error::Error;
 #[async_trait]
 pub trait NewsFetcher: Send + Sync {
     /// Fetch news from this source
-    async fn fetch(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn Error>>;
+    async fn fetch(&self, limit: usize) -> Result<Vec<NewsItem>, Box<dyn Error + Send + Sync>>;
     
     /// Get the name of this source
     fn source_name(&self) -> &str;
