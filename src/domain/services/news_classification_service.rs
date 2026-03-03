@@ -20,16 +20,6 @@ impl Default for NewsClassificationService {
 }
 
 impl NewsClassificationService {
-    /// Get a global singleton instance of the classification service
-    /// 
-    /// This is thread-safe and lazily initialized on first use.
-    /// Perfect for use cases where a shared classification service is needed.
-    pub fn instance() -> &'static Self {
-        use std::sync::OnceLock;
-        static INSTANCE: OnceLock<NewsClassificationService> = OnceLock::new();
-        INSTANCE.get_or_init(|| NewsClassificationService::new())
-    }
-
     /// Create a new classification service with default rules
     pub fn new() -> Self {
         let mut keywords: HashMap<Domain, Vec<String>> = HashMap::new();
