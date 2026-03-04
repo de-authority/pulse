@@ -1,6 +1,6 @@
 pub mod news_item;
 
-pub use news_item::NewsItem;
+pub use news_item::{NewsItem, NewsItemStatus};
 
 /// News domain/category
 ///
@@ -8,7 +8,9 @@ pub use news_item::NewsItem;
 /// - AI: Artificial Intelligence and machine learning news
 /// - Block: Blockchain and cryptocurrency news
 /// - Social: Social media and social platform news
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, clap::ValueEnum)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, clap::ValueEnum, serde::Serialize, serde::Deserialize,
+)]
 pub enum Domain {
     /// AI-related news (ChatGPT, GPT, LLM, ML, etc.)
     AI,
@@ -16,8 +18,6 @@ pub enum Domain {
     Block,
     /// Social media news (Twitter, Facebook, Instagram, etc.)
     Social,
-    /// Uncategorized or unknown domain
-    Uncategorized,
 }
 
 impl Domain {
@@ -27,7 +27,6 @@ impl Domain {
             Domain::AI => "AI",
             Domain::Block => "Block",
             Domain::Social => "Social",
-            Domain::Uncategorized => "Uncategorized",
         }
     }
 }
@@ -47,7 +46,6 @@ mod tests {
         assert_eq!(Domain::AI.display_name(), "AI");
         assert_eq!(Domain::Block.display_name(), "Block");
         assert_eq!(Domain::Social.display_name(), "Social");
-        assert_eq!(Domain::Uncategorized.display_name(), "Uncategorized");
     }
 
     #[test]

@@ -1,0 +1,72 @@
+{
+  "strong_keywords": {
+    "AI": [
+      "gpt-4",
+      "gpt4",
+      "chatgpt",
+      "openai",
+      "claude",
+      "gemini",
+      "llm",
+      "generative ai",
+      "deep learning",
+      "neural network"
+    ],
+    "Block": [
+      "bitcoin",
+      "btc",
+      "ethereum",
+      "eth",
+      "web3",
+      "defi",
+      "nft",
+      "smart contract"
+    ],
+    "Social": [
+      "twitter",
+      "tiktok",
+      "instagram",
+      "meta",
+      "youtube",
+      "discord",
+      "telegram"
+    ]
+  },
+  "weak_keywords": {
+    "AI": [
+      "ai",
+      "machine learning",
+      "ml",
+      "model",
+      "ai agents",
+      "speculative",
+      "decoding",
+      "inference",
+      "fine-tuning",
+      "神经网络",
+      "形式化验证",
+      "weave",
+      "实体合并",
+      "代码合并",
+      "ai代理",
+      "torchlean",
+      "软件开发",
+      "验证"
+    ],
+    "Social": [
+      "social media",
+      "influencer",
+      "viral"
+    ],
+    "Block": [
+      "crypto",
+      "blockchain",
+      "token",
+      "智能合约",
+      "grapheneos",
+      "security",
+      "partnership"
+    ]
+  },
+  "source_tendency": {}
+}

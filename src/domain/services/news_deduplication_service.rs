@@ -3,22 +3,21 @@
 //! Provides deduplication logic for news items based on various criteria.
 
 use crate::domain::NewsItem;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Service for deduplicating news items
 pub struct NewsDeduplicationService;
 
 impl NewsDeduplicationService {
     /// Deduplicate news items by URL
-    /// 
+    ///
     /// Keeps only the first occurrence of each unique URL.
     pub fn deduplicate_by_url(news: Vec<NewsItem>) -> Vec<NewsItem> {
-        let mut seen = HashMap::new();
+        let mut seen: HashSet<String> = HashSet::new();
         let mut result = Vec::new();
 
         for item in news {
-            if !seen.contains_key(&item.url) {
-                seen.insert(item.url.clone(), true);
+            if seen.insert(item.url.clone()) {
                 result.push(item);
             }
         }
@@ -27,15 +26,14 @@ impl NewsDeduplicationService {
     }
 
     /// Deduplicate news items by title
-    /// 
+    ///
     /// Keeps only the first occurrence of each unique title.
     pub fn deduplicate_by_title(news: Vec<NewsItem>) -> Vec<NewsItem> {
-        let mut seen = HashMap::new();
+        let mut seen: HashSet<String> = HashSet::new();
         let mut result = Vec::new();
 
         for item in news {
-            if !seen.contains_key(&item.title) {
-                seen.insert(item.title.clone(), true);
+            if seen.insert(item.title.clone()) {
                 result.push(item);
             }
         }
@@ -44,16 +42,15 @@ impl NewsDeduplicationService {
     }
 
     /// Deduplicate news items by both URL and title
-    /// 
+    ///
     /// Keeps only items that have unique combinations of URL and title.
     pub fn deduplicate_by_url_and_title(news: Vec<NewsItem>) -> Vec<NewsItem> {
-        let mut seen = HashMap::new();
+        let mut seen: HashSet<(String, String)> = HashSet::new();
         let mut result = Vec::new();
 
         for item in news {
             let key = (item.url.clone(), item.title.clone());
-            if !seen.contains_key(&key) {
-                seen.insert(key, true);
+            if seen.insert(key) {
                 result.push(item);
             }
         }
@@ -62,14 +59,12 @@ impl NewsDeduplicationService {
     }
 }
 
-
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
     use chrono::Utc;
-    fn create_test_news_item(id:&str, url: &str, title: &str) -> NewsItem {
-            NewsItem::new(
+    fn create_test_news_item(id: &str, url: &str, title: &str) -> NewsItem {
+        NewsItem::new(
             id.to_string(),
             title.to_string(),
             url.to_string(),
@@ -78,7 +73,7 @@ mod tests{
             Utc::now(),
         )
     }
-        #[test]
+    #[test]
     fn test_deduplicate_by_url_removes_duplicates() {
         let news = vec![
             create_test_news_item("1", "http://example.com/1", "Title 1"),
@@ -131,7 +126,6 @@ mod tests{
             create_test_news_item("5", "http://example.com/2", "Title B"), // Same as above
         ];
 
-
         let result = NewsDeduplicationService::deduplicate_by_url_and_title(news);
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].title, "Title A");
@@ -149,9 +143,12 @@ mod tests{
 
     #[test]
     fn test_deduplicate_single_item() {
-        let news = vec![create_test_news_item("1", "http://example.com/1", "Title 1")];
+        let news = vec![create_test_news_item(
+            "1",
+            "http://example.com/1",
+            "Title 1",
+        )];
         let result = NewsDeduplicationService::deduplicate_by_url(news);
         assert_eq!(result.len(), 1);
     }
-
 }

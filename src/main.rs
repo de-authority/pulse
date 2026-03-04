@@ -51,7 +51,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             };
 
             let hn_fetcher = Arc::new(HackerNewsSource::new());
-            let classifier = Arc::new(NewsClassificationService::new());
+
+            // 初始化 AI 仲裁服务 (Ollama)
+            let ai_service = Arc::new(infrastructure::OllamaInferenceService::new("qwen2.5"));
+            let classifier =
+                Arc::new(NewsClassificationService::new().with_inference_service(ai_service));
 
             info!("🌐 正在从 Hacker News 抓取数据...");
             let news_items =
@@ -158,9 +162,19 @@ mod integration_tests {
 
         let base_time = Utc::now();
         let test_news = vec![
-            create_test_news("1", "Latest News", "url1", base_time + Duration::hours(1)),
-            create_test_news("2", "Duplicate Title", "url2", base_time),
-            create_test_news("3", "Another News", "url3", base_time - Duration::hours(1)),
+            create_test_news(
+                "1",
+                "Latest GPT-4 News",
+                "url1",
+                base_time + Duration::hours(1),
+            ),
+            create_test_news("2", "Bitcoin Price Analysis", "url2", base_time),
+            create_test_news(
+                "3",
+                "Social Media Trends",
+                "url3",
+                base_time - Duration::hours(1),
+            ),
         ];
 
         // 模拟抓取并保存
@@ -177,7 +191,7 @@ mod integration_tests {
         // 验证可以加载数据
         let loaded = repository.find_recent(10).await.unwrap();
         assert_eq!(loaded.len(), 3);
-        assert_eq!(loaded[0].title, "Latest News"); // 最新在前
+        assert_eq!(loaded[0].title, "Latest GPT-4 News"); // 最新在前
     }
 
     #[tokio::test]
@@ -188,8 +202,13 @@ mod integration_tests {
 
         let base_time = Utc::now();
         let news_with_duplicates = vec![
-            create_test_news("1", "First", "same-url", base_time),
-            create_test_news("2", "Second", "same-url", base_time - Duration::minutes(10)),
+            create_test_news("1", "GPT-4 First", "same-url", base_time),
+            create_test_news(
+                "2",
+                "GPT-4 Second",
+                "same-url",
+                base_time - Duration::minutes(10),
+            ),
         ];
 
         let mock_fetcher = MockNewsFetcher::with_data(news_with_duplicates);
@@ -204,6 +223,6 @@ mod integration_tests {
 
         // 验证是第一条
         let loaded = repository.find_recent(10).await.unwrap();
-        assert_eq!(loaded[0].title, "First");
+        assert_eq!(loaded[0].title, "GPT-4 First");
     }
 }

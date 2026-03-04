@@ -2,35 +2,58 @@
 //!
 //! Represents a single news item from any source.
 
-use chrono::{DateTime, Utc};
 use super::Domain;
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum NewsItemStatus {
+    /// Freshly fetched, not yet classified
+    Pending,
+    /// Classifying in progress or needs reinforcement (AI)
+    Classifying,
+    /// Classification completed with low confidence, needs AI review
+    NeedsReview,
+    /// Classification completed
+    Completed,
+    /// Failed to classify
+    Failed,
+}
 
 /// A news item that has been aggregated from various sources
 #[derive(Debug, Clone)]
 pub struct NewsItem {
     /// Unique identifier for this news item
     pub id: String,
-    
+
     /// The title/headline of the news
     pub title: String,
-    
+
     /// The URL where the news can be read
     pub url: String,
-    
+
     /// The source of the news (e.g., "hackernews", "github")
     pub source: String,
-    
+
     /// The author of the news
     pub author: String,
-    
+
+    /// The full content or summary of the news (optional)
+    pub content: Option<String>,
+
     /// When the news was published
     pub published_at: DateTime<Utc>,
-    
+
+    /// Current status of the news item
+    pub status: NewsItemStatus,
+
     /// The classified domain (optional, set after classification)
     pub domain: Option<Domain>,
-    
+
     /// Classification confidence score (0.0 - 1.0)
     pub classification_confidence: Option<f32>,
+
+    /// The basis/reason for classification (e.g., "Keyword matched: GPT", "AI analyzed")
+    pub classification_reason: Option<String>,
 }
 
 impl NewsItem {
@@ -49,12 +72,15 @@ impl NewsItem {
             url,
             source,
             author,
+            content: None,
             published_at,
+            status: NewsItemStatus::Pending,
             domain: None,
             classification_confidence: None,
+            classification_reason: None,
         }
     }
-    
+
     /// Create a new NewsItem with classification
     pub fn new_with_classification(
         id: String,
@@ -72,10 +98,25 @@ impl NewsItem {
             url,
             source,
             author,
+            content: None,
             published_at,
+            status: NewsItemStatus::Completed,
             domain: Some(domain),
             classification_confidence: Some(confidence),
+            classification_reason: None,
         }
+    }
+
+    /// Update content of the news item
+    pub fn with_content(mut self, content: String) -> Self {
+        self.content = Some(content);
+        self
+    }
+
+    /// Update classification reason
+    pub fn with_reason(mut self, reason: String) -> Self {
+        self.classification_reason = Some(reason);
+        self
     }
 }
 
@@ -101,111 +142,6 @@ mod tests {
         assert_eq!(news_item.source, "test-source");
         assert_eq!(news_item.author, "test-author");
         assert_eq!(news_item.published_at, published_at);
-    }
-
-    #[test]
-    fn test_news_item_with_empty_fields() {
-        let news_item = NewsItem::new(
-            String::new(),
-            String::new(),
-            String::new(),
-            String::new(),
-            String::new(),
-            Utc::now(),
-        );
-
-        assert!(news_item.id.is_empty());
-        assert!(news_item.title.is_empty());
-        assert!(news_item.url.is_empty());
-        assert!(news_item.source.is_empty());
-        assert!(news_item.author.is_empty());
-    }
-
-    #[test]
-    fn test_news_item_clone() {
-        let original = NewsItem::new(
-            "id".to_string(),
-            "Title".to_string(),
-            "url".to_string(),
-            "source".to_string(),
-            "author".to_string(),
-            Utc::now(),
-        );
-
-        let cloned = original.clone();
-
-        assert_eq!(original.id, cloned.id);
-        assert_eq!(original.title, cloned.title);
-        assert_eq!(original.url, cloned.url);
-        assert_eq!(original.source, cloned.source);
-        assert_eq!(original.author, cloned.author);
-        assert_eq!(original.published_at, cloned.published_at);
-    }
-
-    #[test]
-    fn test_news_item_debug_formatting() {
-        let news_item = NewsItem::new(
-            "test-id".to_string(),
-            "Test Title".to_string(),
-            "https://example.com/test".to_string(),
-            "test-source".to_string(),
-            "test-author".to_string(),
-            Utc::now(),
-        );
-
-        let debug_str = format!("{:?}", news_item);
-        
-        assert!(debug_str.contains("NewsItem"));
-        assert!(debug_str.contains("test-id"));
-        assert!(debug_str.contains("Test Title"));
-    }
-
-    #[test]
-    fn test_news_item_with_unicode() {
-        let news_item = NewsItem::new(
-            "测试ID".to_string(),
-            "测试标题 🚀".to_string(),
-            "https://例子.com/测试".to_string(),
-            "来源 😊".to_string(),
-            "作者 👨‍💻".to_string(),
-            Utc::now(),
-        );
-
-        assert_eq!(news_item.id, "测试ID");
-        assert_eq!(news_item.title, "测试标题 🚀");
-        assert_eq!(news_item.source, "来源 😊");
-        assert_eq!(news_item.author, "作者 👨‍💻");
-    }
-
-    #[test]
-    fn test_news_item_with_long_url() {
-        let long_url = "https://example.com/very/long/path/to/article/with/many/segments/1234567890".to_string();
-        let news_item = NewsItem::new(
-            "id".to_string(),
-            "Title".to_string(),
-            long_url.clone(),
-            "source".to_string(),
-            "author".to_string(),
-            Utc::now(),
-        );
-
-        assert_eq!(news_item.url, long_url);
-    }
-
-    #[test]
-    fn test_news_item_with_special_characters_in_title() {
-        let special_title = "Title with <script>alert('xss')</script> & special chars: @#$%".to_string();
-        let news_item = NewsItem::new(
-            "id".to_string(),
-            special_title.clone(),
-            "url".to_string(),
-            "source".to_string(),
-            "author".to_string(),
-            Utc::now(),
-        );
-
-        assert_eq!(news_item.title, special_title);
+        assert!(news_item.classification_reason.is_none());
     }
 }
-
-

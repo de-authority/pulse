@@ -81,9 +81,11 @@ impl<'a> FetchHotNewsUseCase for FetchHotNewsService<'a> {
         // 3. 排序（按时间，最新的在前）
         let sorted_news = NewsSortingService::sort_by_published_at_desc(unique_news);
 
-        // 4. 分类新闻
+        // 4. 分类新闻并过滤掉无关项
         let mut news_items = sorted_news;
-        self.classifier.classify_batch(&mut news_items);
+        self.classifier
+            .classify_batch_and_filter(&mut news_items)
+            .await;
 
         // 5. 保存到数据库（如果提供了 Repository）
         if let Some(ref repo) = self.repository {

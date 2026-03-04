@@ -86,16 +86,6 @@ pub async fn display_news(news_items: &[crate::domain::NewsItem]) {
             print_news_item(i + 1, news);
         }
     }
-
-    // 展示未分类新闻
-    let uncategorized = grouped.get(&Domain::Uncategorized).unwrap();
-    if !uncategorized.is_empty() {
-        info!("📋 其他分类 ({} 条)", uncategorized.len());
-        info!("───────────────────────────────────────────");
-        for (i, news) in uncategorized.iter().enumerate() {
-            print_news_item(i + 1, news);
-        }
-    }
 }
 
 /// 显示统计信息
@@ -122,4 +112,7 @@ fn print_news_item(index: usize, news: &crate::domain::NewsItem) {
     info!("  【{}】{}", index, news.title);
     info!("      来源: {} | 作者: {}", news.source, news.author);
     info!("      链接: {}", news.url);
+    if let Some(ref reason) = news.classification_reason {
+        info!("      依据: {}", reason);
+    }
 }

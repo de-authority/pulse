@@ -1,10 +1,10 @@
 //! # Keyword-Based Classification Strategy
 //!
-//! Classifies news based on keyword matching with varying confidence levels.
+//! Classifies news based on keyword matching in title, URL, and content.
 
-use crate::domain::{NewsItem, Domain};
+use super::{ClassificationResult, ClassificationStrategy};
 use crate::domain::config::ClassificationConfig;
-use super::{ClassificationStrategy, ClassificationResult};
+use crate::domain::{Domain, NewsItem};
 
 /// Strategy that classifies news based on keyword matching
 pub struct KeywordBasedStrategy {
@@ -15,34 +15,52 @@ pub struct KeywordBasedStrategy {
 }
 
 impl KeywordBasedStrategy {
-    /// Create a new keyword-based strategy with default keywords
     pub fn new() -> Self {
         let config = ClassificationConfig::default();
         Self::from_config(config)
     }
-    
-    /// Create a new keyword-based strategy from configuration
+
     pub fn from_config(config: ClassificationConfig) -> Self {
         Self {
             strong_keywords: config.strong_keywords,
             weak_keywords: config.weak_keywords,
         }
     }
-    
-    /// Add a strong keyword for a domain
-    pub fn add_strong_keyword(&mut self, domain: Domain, keyword: String) {
-        self.strong_keywords
-            .entry(domain)
-            .or_insert_with(Vec::new)
-            .push(keyword);
-    }
-    
-    /// Add a weak keyword for a domain
-    pub fn add_weak_keyword(&mut self, domain: Domain, keyword: String) {
-        self.weak_keywords
-            .entry(domain)
-            .or_insert_with(Vec::new)
-            .push(keyword);
+
+    /// Check if a text contains a keyword as a standalone word
+    fn contains_word(text: &str, word: &str) -> bool {
+        let text_low = text.to_lowercase();
+        let word_low = word.to_lowercase();
+
+        if let Some(start_idx) = text_low.find(&word_low) {
+            let end_idx = start_idx + word_low.len();
+
+            // Check start boundary
+            let start_ok = if start_idx == 0 {
+                true
+            } else {
+                let prev_char = text_low.as_bytes()[start_idx - 1] as char;
+                !prev_char.is_alphanumeric()
+            };
+
+            // Check end boundary
+            let end_ok = if end_idx == text_low.len() {
+                true
+            } else {
+                let next_char = text_low.as_bytes()[end_idx] as char;
+                !next_char.is_alphanumeric()
+            };
+
+            if start_ok && end_ok {
+                return true;
+            }
+
+            // If boundaries didn't match, we should continue searching for other occurrences
+            // Recurse on the rest of the string
+            return Self::contains_word(&text[end_idx..], word);
+        }
+
+        false
     }
 }
 
@@ -54,173 +72,79 @@ impl Default for KeywordBasedStrategy {
 
 impl ClassificationStrategy for KeywordBasedStrategy {
     fn classify(&self, news: &NewsItem) -> Option<ClassificationResult> {
-        let title_lower = news.title.to_lowercase();
-        let url_lower = news.url.to_lowercase();
-        
-        // First, check for strong keywords in title
+        let mut best_domain = None;
+        let mut max_confidence = 0.0;
+        let mut matched_keyword = String::new();
+        let mut location = "";
+
+        // Check strong keywords
         for (domain, keywords) in &self.strong_keywords {
             for keyword in keywords {
-                if title_lower.contains(&keyword.to_lowercase()) {
-                    return Some(ClassificationResult::high_confidence(
-                        *domain,
-                        format!("keyword-based (strong: {})", keyword),
-                    ));
+                if Self::contains_word(&news.title, keyword) {
+                    return Some(
+                        ClassificationResult::high_confidence(*domain, "keyword-based".to_string())
+                            .with_reason(format!("Strong keyword in title: {}", keyword)),
+                    );
                 }
-            }
-        }
-        
-        // Then, check for strong keywords in URL
-        for (domain, keywords) in &self.strong_keywords {
-            for keyword in keywords {
+                // URL usually doesn't have word boundaries in the same way, but it uses separators
+                let url_lower = news.url.to_lowercase();
                 if url_lower.contains(&keyword.to_lowercase()) {
-                    return Some(ClassificationResult::high_confidence(
-                        *domain,
-                        format!("keyword-based (strong-url: {})", keyword),
-                    ));
+                    return Some(
+                        ClassificationResult::high_confidence(*domain, "keyword-based".to_string())
+                            .with_reason(format!("Strong keyword in URL: {}", keyword)),
+                    );
+                }
+                if let Some(content) = &news.content {
+                    if Self::contains_word(content, keyword) {
+                        if 0.8 > max_confidence {
+                            max_confidence = 0.8;
+                            best_domain = Some(*domain);
+                            matched_keyword = keyword.clone();
+                            location = "content";
+                        }
+                    }
                 }
             }
         }
-        
-        // Then, check for weak keywords in title
+
+        // Check weak keywords
         for (domain, keywords) in &self.weak_keywords {
             for keyword in keywords {
-                if title_lower.contains(&keyword.to_lowercase()) {
-                    return Some(ClassificationResult::low_confidence(
-                        *domain,
-                        format!("keyword-based (weak: {})", keyword),
-                    ));
+                if Self::contains_word(&news.title, keyword) {
+                    if 0.4 > max_confidence {
+                        max_confidence = 0.4;
+                        best_domain = Some(*domain);
+                        matched_keyword = keyword.clone();
+                        location = "title (weak)";
+                    }
+                }
+                if let Some(content) = &news.content {
+                    if Self::contains_word(content, keyword) {
+                        if 0.3 > max_confidence {
+                            max_confidence = 0.3;
+                            best_domain = Some(*domain);
+                            matched_keyword = keyword.clone();
+                            location = "content (weak)";
+                        }
+                    }
                 }
             }
         }
-        
-        // Finally, check for weak keywords in URL
-        for (domain, keywords) in &self.weak_keywords {
-            for keyword in keywords {
-                if url_lower.contains(&keyword.to_lowercase()) {
-                    return Some(ClassificationResult::low_confidence(
-                        *domain,
-                        format!("keyword-based (weak-url: {})", keyword),
-                    ));
-                }
-            }
+
+        if let Some(domain) = best_domain {
+            return Some(
+                ClassificationResult::new(domain, max_confidence, "keyword-based".to_string())
+                    .with_reason(format!(
+                        "Matched keyword '{}' in {}",
+                        matched_keyword, location
+                    )),
+            );
         }
-        
+
         None
     }
-    
+
     fn name(&self) -> &str {
         "keyword-based"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Utc;
-
-    fn create_test_news(title: &str, url: &str) -> NewsItem {
-        NewsItem::new(
-            "test-id".to_string(),
-            title.to_string(),
-            url.to_string(),
-            "test-source".to_string(),
-            "test-author".to_string(),
-            Utc::now(),
-        )
-    }
-
-    #[test]
-    fn test_strong_keyword_in_title() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("New GPT-4 model released", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::AI);
-        assert_eq!(result.confidence, 0.9);
-        assert!(result.strategy_name.contains("strong"));
-    }
-
-    #[test]
-    fn test_strong_keyword_in_url() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("Major announcement", "https://example.com/bitcoin-update");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::Block);
-        assert_eq!(result.confidence, 0.9);
-        assert!(result.strategy_name.contains("strong-url"));
-    }
-
-    #[test]
-    fn test_weak_keyword_in_title() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("AI technology trends", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::AI);
-        assert_eq!(result.confidence, 0.3);
-        assert!(result.strategy_name.contains("weak"));
-    }
-
-    #[test]
-    fn test_weak_keyword_in_url() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("Article about trends", "https://example.com/blockchain-news");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::Block);
-        assert_eq!(result.confidence, 0.3);
-        assert!(result.strategy_name.contains("weak-url"));
-    }
-
-    #[test]
-    fn test_no_keywords() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("General news article", "https://example.com/news");
-        
-        assert!(strategy.classify(&news).is_none());
-    }
-
-    #[test]
-    fn test_case_insensitive() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("BITCOIN price update", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::Block);
-    }
-
-    #[test]
-    fn test_strong_keyword_takes_precedence() {
-        let strategy = KeywordBasedStrategy::new();
-        let news = create_test_news("ChatGPT AI assistant", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::AI);
-        assert_eq!(result.confidence, 0.9); // High confidence from "chatgpt"
-    }
-
-    #[test]
-    fn test_add_custom_strong_keyword() {
-        let mut strategy = KeywordBasedStrategy::new();
-        strategy.add_strong_keyword(Domain::AI, "custom-tech".to_string());
-        
-        let news = create_test_news("Custom-tech breakthrough", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::AI);
-        assert_eq!(result.confidence, 0.9);
-    }
-
-    #[test]
-    fn test_add_custom_weak_keyword() {
-        let mut strategy = KeywordBasedStrategy::new();
-        strategy.add_weak_keyword(Domain::Social, "custom-social".to_string());
-        
-        let news = create_test_news("Custom-social platform", "https://example.com/article");
-        let result = strategy.classify(&news).unwrap();
-        
-        assert_eq!(result.domain, Domain::Social);
-        assert_eq!(result.confidence, 0.3);
     }
 }

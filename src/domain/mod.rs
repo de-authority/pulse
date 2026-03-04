@@ -6,7 +6,8 @@ pub mod services;
 pub mod strategies;
 
 // 重新导出常用的类型，方便使用
-pub use entities::{Domain, NewsItem};
+pub use entities::{Domain, NewsItem, NewsItemStatus};
 pub use fetchers::NewsFetcher;
 pub use repositories::NewsRepository;
 pub use services::{NewsClassificationService, NewsDeduplicationService, NewsSortingService};
+pub use strategies::{ClassificationStrategy, KeywordBasedStrategy};
